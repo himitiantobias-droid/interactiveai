@@ -389,6 +389,20 @@ function exitPetting() {
 const EASE_RISE = 'cubic-bezier(0,0,.2,1)';
 const EASE_FALL = 'cubic-bezier(.8,0,1,1)';
 
+// Puntos de un pique real: x avanza parejo, y sigue una parábola (sube y
+// baja), muestreada en varios pasos para que se vea un arco curvo y no una
+// línea recta en V.
+function bounceArc(fromX, dx, height, steps = 8) {
+  const kfs = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = fromX + dx * t;
+    const y = -4 * height * t * (1 - t);
+    kfs.push({ transform: `translate(calc(-50% + ${x}px), ${y}px)` });
+  }
+  return kfs;
+}
+
 let ballBusy = false;
 function playWithBall() {
   if (state.dead || ballBusy || busy) return;
@@ -398,43 +412,51 @@ function playWithBall() {
   save();
 
   ballEl.style.transition = '';
-  ballEl.style.transform = 'translate(-50%, 0)';
+  ballEl.style.transform = 'translate(-50%, -260px)';
   ballEl.classList.add('visible');
 
-  // Tres piques, cada uno más bajo y más corto que el anterior.
-  const bounceKeyframes = [
-    { transform: 'translate(-50%, 0)',       offset: 0,     easing: EASE_RISE },
-    { transform: 'translate(-50%, -150px)',  offset: 0.2,   easing: EASE_FALL },
-    { transform: 'translate(-50%, 0)',       offset: 0.4,   easing: EASE_RISE },
-    { transform: 'translate(-42%, -90px)',   offset: 0.57,  easing: EASE_FALL },
-    { transform: 'translate(-42%, 0)',       offset: 0.74,  easing: EASE_RISE },
-    { transform: 'translate(-34%, -45px)',   offset: 0.87,  easing: EASE_FALL },
-    { transform: 'translate(-34%, 0)',       offset: 1 }
-  ];
-  const anim = ballEl.animate(bounceKeyframes, { duration: 1250 });
+  // 1) Cae de arriba de la pantalla al piso (primer pique).
+  const fall = ballEl.animate(
+    [{ transform: 'translate(-50%, -260px)' }, { transform: 'translate(-50%, 0px)' }],
+    { duration: 480, easing: EASE_FALL, fill: 'forwards' }
+  );
+  fall.onfinish = () => {
+    ballEl.style.transform = 'translate(-50%, 0px)';
 
-  anim.onfinish = () => {
-    ballEl.style.transition = 'transform .3s ease';
-    ballEl.style.transform = 'translate(64px, -6px)';
+    // 2) Segundo pique: arco hacia el costado donde la va a agarrar.
+    const bounce2 = ballEl.animate(bounceArc(0, 55, 85), { duration: 480, easing: 'linear', fill: 'forwards' });
+    bounce2.onfinish = () => {
+      ballEl.style.transform = 'translate(calc(-50% + 55px), 0px)';
 
-    setTimeout(() => {
-      stageEl.classList.add('away');
-      parkEl.classList.add('active');
-      setTimeout(playParkTrick, 350);
+      // 3) Tercer pique, más chico, termina justo donde la "agarra".
+      const bounce3 = ballEl.animate(bounceArc(55, 9, 30), { duration: 360, easing: 'linear', fill: 'forwards' });
+      bounce3.onfinish = () => {
+        ballEl.style.transform = 'translate(calc(-50% + 64px), 0px)';
 
-      setTimeout(() => {
-        stageEl.classList.remove('away');
-        parkEl.classList.remove('active');
+        // Se acomoda pegada a la mano, como agarrada.
+        ballEl.style.transition = 'transform .25s ease';
+        ballEl.style.transform = 'translate(64px, -6px)';
 
         setTimeout(() => {
-          ballEl.classList.remove('visible');
-          ballEl.style.transform = '';
-          ballEl.style.transition = '';
-          ballBusy = false;
-          busy = false;
-        }, 700);
-      }, 2400);
-    }, 500);
+          stageEl.classList.add('away');
+          parkEl.classList.add('active');
+          setTimeout(playParkTrick, 350);
+
+          setTimeout(() => {
+            stageEl.classList.remove('away');
+            parkEl.classList.remove('active');
+
+            setTimeout(() => {
+              ballEl.classList.remove('visible');
+              ballEl.style.transform = '';
+              ballEl.style.transition = '';
+              ballBusy = false;
+              busy = false;
+            }, 700);
+          }, 2400);
+        }, 450);
+      };
+    };
   };
 }
 
