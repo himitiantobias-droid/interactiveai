@@ -12,14 +12,26 @@ const ballEl = $('ball');
 const stageEl = $('stage');
 const parkEl = $('park');
 const reviveHint = $('reviveHint');
+const sceneEl = $('scene');
+const petNameEl = $('petName');
+const editNameBtn = $('editNameBtn');
+
+function denied() {
+  sceneEl.classList.remove('deny-shake');
+  void sceneEl.offsetWidth;
+  sceneEl.classList.add('deny-shake');
+}
 
 const HOUR = 3_600_000;
 const DAY_MS = 24 * HOUR;
 const PLATOS_CAP = 3;
 const BITES_PER_PLATE = 10;
 const WATER_CAP = 8;
-const DEATH_DAYS = 14;
+const DEATH_DAYS = 3;
+const MOURNING_MS = 3 * HOUR;
 const PET_HOLD_THRESHOLD = 250;
+const PARK_SOLO_MS = 15 * 60 * 1000;
+const PARK_FRIENDS_MS = 2 * HOUR;
 const STORAGE_KEY = 'avatarPetState_v1';
 
 const EYES = {
@@ -71,7 +83,10 @@ function defaultState() {
     malnourishedStreak: 0,
     moodScore: 0,
     sickUntil: null,
-    dead: false
+    parkUntil: null,
+    dead: false,
+    diedAt: null,
+    petName: ''
   };
 }
 function load() {
@@ -100,8 +115,13 @@ function evaluateDay(bitesTotal, water, affection, ballPlays, platosCompleted) {
   state.malnourishedStreak = platosCompleted >= PLATOS_CAP ? 0 : (state.malnourishedStreak || 0) + 1;
 
   if (state.daysWithoutFood >= DEATH_DAYS && state.daysWithoutWater >= DEATH_DAYS) {
-    state.dead = true;
+    die();
   }
+}
+
+function die() {
+  state.dead = true;
+  state.diedAt = Date.now();
 }
 
 function rolloverIfNeeded() {
@@ -128,6 +148,20 @@ function rolloverIfNeeded() {
 
 function isSick() {
   return !!state.sickUntil && Date.now() < state.sickUntil;
+}
+function isAtPark() {
+  return !!state.parkUntil && Date.now() < state.parkUntil;
+}
+function returnFromPark() {
+  state.parkUntil = null;
+  save();
+  stageEl.classList.remove('away');
+  parkEl.classList.remove('active');
+  ballEl.classList.remove('visible');
+  ballEl.style.transform = '';
+  ballEl.style.transition = '';
+  ballBusy = false;
+  busy = false;
 }
 
 function currentTier() {
@@ -157,9 +191,28 @@ function applyBaseExpression() {
   avatarFrame.classList.toggle('dead', tier === 'muerto');
 }
 
+function mourningRemaining() {
+  if (!state.diedAt) return 0;
+  return MOURNING_MS - (Date.now() - state.diedAt);
+}
 function updateReviveHint() {
   reviveHint.hidden = !state.dead;
+  if (!state.dead) return;
+  reviveHint.innerHTML = mourningRemaining() > 0
+    ? 'Se murió — todavía está de duelo.'
+    : 'Se murió — presioná <strong>R</strong> para revivirla.';
 }
+
+function renderName() {
+  petNameEl.textContent = state.petName || 'Nombre';
+}
+editNameBtn.addEventListener('click', () => {
+  const input = prompt('¿Cómo se llama?', state.petName || '');
+  if (input === null) return;
+  state.petName = input.trim().slice(0, 24);
+  save();
+  renderName();
+});
 
 // --- Gestos idle: parpadeo, guiño, boca suelta ---
 let busy = false;
@@ -203,10 +256,11 @@ function feed() {
   if (eating) {
     // Le dieron otra croqueta antes de tragar la anterior: riesgo de ahogo.
     rapidFeedAttempts++;
+    denied();
     if (rapidFeedAttempts > MAX_RAPID_FEED) choke();
     return;
   }
-  if (busy) return;
+  if (busy) { denied(); return; }
 
   const startingNewPlato = state.bitesInCurrentPlato === 0;
   if (startingNewPlato && state.platosToday >= PLATOS_CAP) {
@@ -227,7 +281,8 @@ function feed() {
   playEatAnimation();
 }
 function water() {
-  if (state.dead || busy) return;
+  if (state.dead) return;
+  if (busy) { denied(); return; }
   if (state.waterToday >= WATER_CAP) { triggerOverfeed(); return; }
   state.waterToday++;
   state.daysWithoutWater = 0;
@@ -280,9 +335,11 @@ function playEatAnimation() {
             state.platosCompletedToday = (state.platosCompletedToday || 0) + 1;
             state.bitesInCurrentPlato = 0;
             plateEl.classList.remove('show');
+            applyBaseExpression();
           }
+          // Si queda comida en el plato, se queda con la boca en O esperando
+          // la próxima croqueta en vez de volver a la expresión normal.
           save();
-          applyBaseExpression();
         }, 380);
       }
     }, 220);
@@ -294,7 +351,7 @@ function choke() {
   busy = false;
   rapidFeedAttempts = 0;
   plateEl.classList.remove('show');
-  state.dead = true;
+  die();
   save();
   applyBaseExpression();
   updateReviveHint();
@@ -350,7 +407,8 @@ let petTimeout = null;
 let affectionInterval = null;
 
 function onSpaceDown() {
-  if (state.dead || spaceHeld || busy) return;
+  if (state.dead || spaceHeld) return;
+  if (busy) { denied(); return; }
   spaceHeld = true;
   petTimeout = setTimeout(enterPetting, PET_HOLD_THRESHOLD);
 }
@@ -438,22 +496,18 @@ function playWithBall() {
         ballEl.style.transform = 'translate(64px, -6px)';
 
         setTimeout(() => {
+          state.parkUntil = Date.now() + PARK_SOLO_MS;
+          save();
           stageEl.classList.add('away');
           parkEl.classList.add('active');
           setTimeout(playParkTrick, 350);
-
+          // Se queda ahí de verdad (15 min reales sola, 2hs si se encuentra con
+          // amigos) — la vuelta la maneja returnFromPark() desde tick().
           setTimeout(() => {
-            stageEl.classList.remove('away');
-            parkEl.classList.remove('active');
-
-            setTimeout(() => {
-              ballEl.classList.remove('visible');
-              ballEl.style.transform = '';
-              ballEl.style.transition = '';
-              ballBusy = false;
-              busy = false;
-            }, 700);
-          }, 2400);
+            ballEl.classList.remove('visible');
+            ballEl.style.transform = '';
+            ballEl.style.transition = '';
+          }, 1600);
         }, 450);
       };
     };
@@ -489,9 +543,16 @@ function playParkTrick() {
   ballEl.animate(pick, { duration: 950 });
 }
 
-function restart() {
-  localStorage.removeItem(STORAGE_KEY);
-  location.reload();
+function revive() {
+  if (!state.dead) return;
+  if (mourningRemaining() > 0) { denied(); return; }
+  const keepName = state.petName;
+  state = defaultState();
+  state.petName = keepName;
+  save();
+  applyBaseExpression();
+  updateReviveHint();
+  renderName();
 }
 
 // --- Teclado ---
@@ -504,7 +565,7 @@ window.addEventListener('keydown', (e) => {
   const key = e.key.toLowerCase();
   if (key === 'c') feed();
   else if (key === 'a') water();
-  else if (key === 'r' && state.dead) restart();
+  else if (key === 'r' && state.dead) revive();
 });
 window.addEventListener('keyup', (e) => {
   if (e.code === 'Space') {
@@ -521,6 +582,7 @@ function tick() {
     state.overflowUnits = 0;
     save();
   }
+  if (state.parkUntil && Date.now() >= state.parkUntil) returnFromPark();
   updateReviveHint();
   if (!busy) applyBaseExpression();
 }
@@ -528,8 +590,19 @@ setInterval(tick, 15000);
 
 // --- Arranque ---
 rolloverIfNeeded();
+if (state.parkUntil && Date.now() >= state.parkUntil) {
+  state.parkUntil = null;
+  save();
+} else if (isAtPark()) {
+  // Seguía en el parque de una visita anterior (se cerró la pestaña antes de volver).
+  busy = true;
+  ballBusy = true;
+  stageEl.classList.add('away');
+  parkEl.classList.add('active');
+}
 applyBaseExpression();
 updateReviveHint();
+renderName();
 if (isSick()) scheduleVomitBursts();
 scheduleBlink();
 scheduleWink();
