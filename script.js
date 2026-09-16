@@ -27,7 +27,8 @@ const DAY_MS = 24 * HOUR;
 const PLATOS_CAP = 3;
 const BITES_PER_PLATE = 10;
 const WATER_CAP = 8;
-const DEATH_DAYS = 14;
+const DEATH_DAYS = 3;
+const MOURNING_MS = 3 * HOUR;
 const PET_HOLD_THRESHOLD = 250;
 const PARK_SOLO_MS = 15 * 60 * 1000;
 const PARK_FRIENDS_MS = 2 * HOUR;
@@ -84,6 +85,7 @@ function defaultState() {
     sickUntil: null,
     parkUntil: null,
     dead: false,
+    diedAt: null,
     petName: ''
   };
 }
@@ -113,8 +115,13 @@ function evaluateDay(bitesTotal, water, affection, ballPlays, platosCompleted) {
   state.malnourishedStreak = platosCompleted >= PLATOS_CAP ? 0 : (state.malnourishedStreak || 0) + 1;
 
   if (state.daysWithoutFood >= DEATH_DAYS && state.daysWithoutWater >= DEATH_DAYS) {
-    state.dead = true;
+    die();
   }
+}
+
+function die() {
+  state.dead = true;
+  state.diedAt = Date.now();
 }
 
 function rolloverIfNeeded() {
@@ -184,8 +191,16 @@ function applyBaseExpression() {
   avatarFrame.classList.toggle('dead', tier === 'muerto');
 }
 
+function mourningRemaining() {
+  if (!state.diedAt) return 0;
+  return MOURNING_MS - (Date.now() - state.diedAt);
+}
 function updateReviveHint() {
   reviveHint.hidden = !state.dead;
+  if (!state.dead) return;
+  reviveHint.innerHTML = mourningRemaining() > 0
+    ? 'Se murió — todavía está de duelo.'
+    : 'Se murió — presioná <strong>R</strong> para revivirla.';
 }
 
 function renderName() {
@@ -334,7 +349,7 @@ function choke() {
   busy = false;
   rapidFeedAttempts = 0;
   plateEl.classList.remove('show');
-  state.dead = true;
+  die();
   save();
   applyBaseExpression();
   updateReviveHint();
@@ -526,9 +541,16 @@ function playParkTrick() {
   ballEl.animate(pick, { duration: 950 });
 }
 
-function restart() {
-  localStorage.removeItem(STORAGE_KEY);
-  location.reload();
+function revive() {
+  if (!state.dead) return;
+  if (mourningRemaining() > 0) { denied(); return; }
+  const keepName = state.petName;
+  state = defaultState();
+  state.petName = keepName;
+  save();
+  applyBaseExpression();
+  updateReviveHint();
+  renderName();
 }
 
 // --- Teclado ---
@@ -541,7 +563,7 @@ window.addEventListener('keydown', (e) => {
   const key = e.key.toLowerCase();
   if (key === 'c') feed();
   else if (key === 'a') water();
-  else if (key === 'r' && state.dead) restart();
+  else if (key === 'r' && state.dead) revive();
 });
 window.addEventListener('keyup', (e) => {
   if (e.code === 'Space') {
