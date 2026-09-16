@@ -335,9 +335,11 @@ function playEatAnimation() {
             state.platosCompletedToday = (state.platosCompletedToday || 0) + 1;
             state.bitesInCurrentPlato = 0;
             plateEl.classList.remove('show');
+            applyBaseExpression();
           }
+          // Si queda comida en el plato, se queda con la boca en O esperando
+          // la próxima croqueta en vez de volver a la expresión normal.
           save();
-          applyBaseExpression();
         }, 380);
       }
     }, 220);
