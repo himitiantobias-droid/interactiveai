@@ -20,6 +20,8 @@ const BITES_PER_PLATE = 10;
 const WATER_CAP = 8;
 const DEATH_DAYS = 14;
 const PET_HOLD_THRESHOLD = 250;
+const PARK_SOLO_MS = 15 * 60 * 1000;
+const PARK_FRIENDS_MS = 2 * HOUR;
 const STORAGE_KEY = 'avatarPetState_v1';
 
 const EYES = {
@@ -71,6 +73,7 @@ function defaultState() {
     malnourishedStreak: 0,
     moodScore: 0,
     sickUntil: null,
+    parkUntil: null,
     dead: false
   };
 }
@@ -128,6 +131,20 @@ function rolloverIfNeeded() {
 
 function isSick() {
   return !!state.sickUntil && Date.now() < state.sickUntil;
+}
+function isAtPark() {
+  return !!state.parkUntil && Date.now() < state.parkUntil;
+}
+function returnFromPark() {
+  state.parkUntil = null;
+  save();
+  stageEl.classList.remove('away');
+  parkEl.classList.remove('active');
+  ballEl.classList.remove('visible');
+  ballEl.style.transform = '';
+  ballEl.style.transition = '';
+  ballBusy = false;
+  busy = false;
 }
 
 function currentTier() {
@@ -438,22 +455,18 @@ function playWithBall() {
         ballEl.style.transform = 'translate(64px, -6px)';
 
         setTimeout(() => {
+          state.parkUntil = Date.now() + PARK_SOLO_MS;
+          save();
           stageEl.classList.add('away');
           parkEl.classList.add('active');
           setTimeout(playParkTrick, 350);
-
+          // Se queda ahí de verdad (15 min reales sola, 2hs si se encuentra con
+          // amigos) — la vuelta la maneja returnFromPark() desde tick().
           setTimeout(() => {
-            stageEl.classList.remove('away');
-            parkEl.classList.remove('active');
-
-            setTimeout(() => {
-              ballEl.classList.remove('visible');
-              ballEl.style.transform = '';
-              ballEl.style.transition = '';
-              ballBusy = false;
-              busy = false;
-            }, 700);
-          }, 2400);
+            ballEl.classList.remove('visible');
+            ballEl.style.transform = '';
+            ballEl.style.transition = '';
+          }, 1600);
         }, 450);
       };
     };
@@ -521,6 +534,7 @@ function tick() {
     state.overflowUnits = 0;
     save();
   }
+  if (state.parkUntil && Date.now() >= state.parkUntil) returnFromPark();
   updateReviveHint();
   if (!busy) applyBaseExpression();
 }
@@ -528,6 +542,16 @@ setInterval(tick, 15000);
 
 // --- Arranque ---
 rolloverIfNeeded();
+if (state.parkUntil && Date.now() >= state.parkUntil) {
+  state.parkUntil = null;
+  save();
+} else if (isAtPark()) {
+  // Seguía en el parque de una visita anterior (se cerró la pestaña antes de volver).
+  busy = true;
+  ballBusy = true;
+  stageEl.classList.add('away');
+  parkEl.classList.add('active');
+}
 applyBaseExpression();
 updateReviveHint();
 if (isSick()) scheduleVomitBursts();
