@@ -13,6 +13,8 @@ const stageEl = $('stage');
 const parkEl = $('park');
 const reviveHint = $('reviveHint');
 const sceneEl = $('scene');
+const petNameEl = $('petName');
+const editNameBtn = $('editNameBtn');
 
 function denied() {
   sceneEl.classList.remove('deny-shake');
@@ -81,7 +83,8 @@ function defaultState() {
     moodScore: 0,
     sickUntil: null,
     parkUntil: null,
-    dead: false
+    dead: false,
+    petName: ''
   };
 }
 function load() {
@@ -184,6 +187,17 @@ function applyBaseExpression() {
 function updateReviveHint() {
   reviveHint.hidden = !state.dead;
 }
+
+function renderName() {
+  petNameEl.textContent = state.petName || 'Nombre';
+}
+editNameBtn.addEventListener('click', () => {
+  const input = prompt('¿Cómo se llama?', state.petName || '');
+  if (input === null) return;
+  state.petName = input.trim().slice(0, 24);
+  save();
+  renderName();
+});
 
 // --- Gestos idle: parpadeo, guiño, boca suelta ---
 let busy = false;
@@ -564,6 +578,7 @@ if (state.parkUntil && Date.now() >= state.parkUntil) {
 }
 applyBaseExpression();
 updateReviveHint();
+renderName();
 if (isSick()) scheduleVomitBursts();
 scheduleBlink();
 scheduleWink();
