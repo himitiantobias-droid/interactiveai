@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avatar IA — mascota</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>Lu</h1>
+  <p>Una cara viva que hay que cuidar. <strong>C</strong> come, <strong>A</strong> bebe, mantené <strong>espacio</strong> para acariciarla, tocalo y soltalo rápido para jugar a la pelota.</p>
+</header>
+
+<main>
+  <div class="scene" id="scene">
+    <div class="park" id="park" aria-hidden="true">
+      <div class="park-hill"></div>
+      <div class="park-tree park-tree--a"></div>
+      <div class="park-tree park-tree--b"></div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="avatar-frame" id="avatarFrame">
+        <div class="glow" id="glow"></div>
+        <svg class="avatar-face" id="avatarFace" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+          <g id="eyes">
+            <ellipse id="eyeL" cx="68" cy="88" rx="11" ry="15"/>
+            <ellipse id="eyeR" cx="132" cy="88" rx="11" ry="15"/>
+          </g>
+          <path id="mouth" d="M 72 132 Q 100 132 128 132"/>
+        </svg>
+
+        <div class="plate" id="plate" aria-hidden="true">
+          <div class="plate-base"></div>
+          <div class="kibble"></div><div class="kibble"></div><div class="kibble"></div>
+          <div class="kibble"></div><div class="kibble"></div>
+        </div>
+
+        <div class="cup" id="cup" aria-hidden="true">
+          <div class="cup-body"><div class="cup-water"></div></div>
+        </div>
+
+        <div class="vomit" id="vomit" aria-hidden="true"></div>
+      </div>
+
+      <div class="ball" id="ball" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <div class="revive-hint" id="reviveHint" hidden>Se murió — presioná <strong>R</strong> para revivirla.</div>
+</main>
+
+<script src="script.js"></script>
+</body>
+</html>
