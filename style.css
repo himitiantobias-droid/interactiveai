@@ -9,6 +9,7 @@
   --plate: #C9A876;
   --kibble: #7A5A3A;
   --water: #4FB6E6;
+  --malnourished: #8C9468;
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
@@ -119,6 +120,10 @@ main{
   opacity: .5;
   animation: sickPulse 2.4s ease-in-out infinite;
 }
+.avatar-frame.malnourished .glow{
+  background: var(--malnourished) !important;
+  opacity: .22;
+}
 .avatar-frame.dead .glow{
   background: #3a3f4a !important;
   opacity: .18;
@@ -163,7 +168,9 @@ main{
   position:absolute; width:7px; height:7px; border-radius:50%;
   background: var(--kibble);
   top: 10px; left: 10px;
+  transition: opacity .2s ease, transform .2s ease;
 }
+.kibble.eaten{ opacity:0; transform: scale(.3); }
 .kibble:nth-child(2){ left:24px; top:12px; }
 .kibble:nth-child(3){ left:38px; top:9px; }
 .kibble:nth-child(4){ left:52px; top:13px; }

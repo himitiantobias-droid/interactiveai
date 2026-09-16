@@ -15,26 +15,29 @@ const reviveHint = $('reviveHint');
 
 const HOUR = 3_600_000;
 const DAY_MS = 24 * HOUR;
-const FOOD_CAP = 3;
+const PLATOS_CAP = 3;
+const BITES_PER_PLATE = 10;
 const WATER_CAP = 8;
 const DEATH_DAYS = 14;
 const PET_HOLD_THRESHOLD = 250;
 const STORAGE_KEY = 'avatarPetState_v1';
 
 const EYES = {
-  neutral: { rx: 11, ry: 15, cy: 88 },
-  feliz:   { rx: 11, ry: 6,  cy: 88 },
-  triste:  { rx: 10, ry: 10, cy: 92 },
-  enfermo: { rx: 9,  ry: 9,  cy: 88 },
-  muerto:  { rx: 11, ry: 1,  cy: 88 }
+  neutral:     { rx: 11, ry: 15, cy: 88 },
+  feliz:       { rx: 11, ry: 6,  cy: 88 },
+  triste:      { rx: 10, ry: 10, cy: 92 },
+  enfermo:     { rx: 9,  ry: 9,  cy: 88 },
+  desnutrido:  { rx: 9,  ry: 8,  cy: 91 },
+  muerto:      { rx: 11, ry: 1,  cy: 88 }
 };
 const MOUTH = {
-  neutral: 'M 72 132 Q 100 132 128 132',
-  feliz:   'M 66 122 Q 100 154 134 122',
-  triste:  'M 70 138 Q 100 118 130 138',
-  enfermo: 'M 68 130 Q 80 140 92 130 Q 104 120 116 130 Q 128 140 132 130',
-  muerto:  'M 75 133 L 125 133',
-  petting: 'M 70 128 Q 100 148 130 128'
+  neutral:     'M 72 132 Q 100 132 128 132',
+  feliz:       'M 66 122 Q 100 154 134 122',
+  triste:      'M 70 138 Q 100 118 130 138',
+  enfermo:     'M 68 130 Q 80 140 92 130 Q 104 120 116 130 Q 128 140 132 130',
+  desnutrido:  'M 74 134 Q 100 128 126 134',
+  muerto:      'M 75 133 L 125 133',
+  petting:     'M 70 128 Q 100 148 130 128'
 };
 const MOUTH_CHEW = 'M 80 126 Q 100 140 120 126';
 const MOUTH_IDLE_OPEN = 'M 78 126 Q 100 142 122 126';
@@ -54,7 +57,10 @@ function daysBetween(aKey, bKey) {
 }
 function defaultState() {
   return {
-    foodToday: 0,
+    platosToday: 0,
+    bitesInCurrentPlato: 0,
+    bitesEatenTotalToday: 0,
+    platosCompletedToday: 0,
     waterToday: 0,
     overflowUnits: 0,
     affectionToday: 0,
@@ -62,6 +68,7 @@ function defaultState() {
     lastDayKey: todayKey(),
     daysWithoutFood: 0,
     daysWithoutWater: 0,
+    malnourishedStreak: 0,
     moodScore: 0,
     sickUntil: null,
     dead: false
@@ -82,13 +89,15 @@ function save() {
 
 let state = load();
 
-function evaluateDay(food, water, affection, ballPlays) {
-  if (food === 0) state.daysWithoutFood++; else state.daysWithoutFood = 0;
+function evaluateDay(bitesTotal, water, affection, ballPlays, platosCompleted) {
+  if (bitesTotal === 0) state.daysWithoutFood++; else state.daysWithoutFood = 0;
   if (water === 0) state.daysWithoutWater++; else state.daysWithoutWater = 0;
 
   const played = (affection || 0) >= 1 || (ballPlays || 0) >= 1;
-  const goodDay = food >= 1 && water >= 1 && played;
+  const goodDay = bitesTotal >= 1 && water >= 1 && played;
   state.moodScore = Math.max(-3, Math.min(3, state.moodScore + (goodDay ? 1 : -1)));
+
+  state.malnourishedStreak = platosCompleted >= PLATOS_CAP ? 0 : (state.malnourishedStreak || 0) + 1;
 
   if (state.daysWithoutFood >= DEATH_DAYS && state.daysWithoutWater >= DEATH_DAYS) {
     state.dead = true;
@@ -100,16 +109,21 @@ function rolloverIfNeeded() {
   if (state.lastDayKey === key) return;
   const gap = Math.max(1, daysBetween(state.lastDayKey, key));
 
-  evaluateDay(state.foodToday, state.waterToday, state.affectionToday, state.ballPlaysToday);
-  for (let i = 1; i < gap; i++) evaluateDay(0, 0, 0, 0);
+  evaluateDay(state.bitesEatenTotalToday, state.waterToday, state.affectionToday, state.ballPlaysToday, state.platosCompletedToday);
+  for (let i = 1; i < gap; i++) evaluateDay(0, 0, 0, 0, 0);
 
-  state.foodToday = 0;
+  state.platosToday = 0;
+  state.bitesInCurrentPlato = 0;
+  state.bitesEatenTotalToday = 0;
+  state.platosCompletedToday = 0;
   state.waterToday = 0;
   state.overflowUnits = 0;
   state.affectionToday = 0;
   state.ballPlaysToday = 0;
   state.lastDayKey = key;
   save();
+  plateEl.classList.remove('show');
+  resetKibbles();
 }
 
 function isSick() {
@@ -119,6 +133,7 @@ function isSick() {
 function currentTier() {
   if (state.dead) return 'muerto';
   if (isSick()) return 'enfermo';
+  if ((state.malnourishedStreak || 0) >= 1) return 'desnutrido';
   if (state.moodScore >= 2) return 'feliz';
   if (state.moodScore <= -2) return 'triste';
   return 'neutral';
@@ -138,6 +153,7 @@ function applyBaseExpression() {
   eyeR.setAttribute('rx', eyeShape.rx); eyeR.setAttribute('ry', eyeShape.ry); eyeR.setAttribute('cy', eyeShape.cy);
   mouth.setAttribute('d', MOUTH[tier] || MOUTH.neutral);
   avatarFrame.classList.toggle('sick', tier === 'enfermo');
+  avatarFrame.classList.toggle('malnourished', tier === 'desnutrido');
   avatarFrame.classList.toggle('dead', tier === 'muerto');
 }
 
@@ -191,8 +207,21 @@ function feed() {
     return;
   }
   if (busy) return;
-  if (state.foodToday >= FOOD_CAP) { triggerOverfeed(); return; }
-  state.foodToday++;
+
+  const startingNewPlato = state.bitesInCurrentPlato === 0;
+  if (startingNewPlato && state.platosToday >= PLATOS_CAP) {
+    // Ya comió sus 3 platos de hoy — este cuarto la empacha.
+    triggerOverfeed();
+    return;
+  }
+  if (startingNewPlato) {
+    state.platosToday++;
+    resetKibbles();
+    plateEl.classList.add('show');
+  }
+
+  state.bitesInCurrentPlato++;
+  state.bitesEatenTotalToday++;
   state.daysWithoutFood = 0;
   save();
   playEatAnimation();
@@ -204,6 +233,15 @@ function water() {
   state.daysWithoutWater = 0;
   save();
   playDrinkAnimation();
+}
+
+function resetKibbles() {
+  plateEl.querySelectorAll('.kibble').forEach((k) => k.classList.remove('eaten'));
+}
+function hideKibble(biteIndex) {
+  const kibbles = plateEl.querySelectorAll('.kibble');
+  const k = kibbles[biteIndex - 1];
+  if (k) k.classList.add('eaten');
 }
 
 function spawnFlyingKibble() {
@@ -220,7 +258,7 @@ function spawnFlyingKibble() {
 function playEatAnimation() {
   eating = true;
   busy = true;
-  plateEl.classList.add('show');
+  hideKibble(state.bitesInCurrentPlato);
   spawnFlyingKibble();
 
   const base = MOUTH[currentTier()] || MOUTH.neutral;
@@ -234,10 +272,16 @@ function playEatAnimation() {
         // Traga: siempre abre la boca en O, es la señal de que ya se le puede dar la próxima.
         mouth.setAttribute('d', MOUTH_O);
         setTimeout(() => {
-          plateEl.classList.remove('show');
           eating = false;
           busy = false;
           rapidFeedAttempts = 0;
+
+          if (state.bitesInCurrentPlato >= BITES_PER_PLATE) {
+            state.platosCompletedToday = (state.platosCompletedToday || 0) + 1;
+            state.bitesInCurrentPlato = 0;
+            plateEl.classList.remove('show');
+          }
+          save();
           applyBaseExpression();
         }, 380);
       }
@@ -340,6 +384,11 @@ function exitPetting() {
   applyBaseExpression();
 }
 
+// Curvas físicas: al subir frena (como si la gravedad la fuera parando),
+// al caer acelera (como si la gravedad la tirara para abajo).
+const EASE_RISE = 'cubic-bezier(0,0,.2,1)';
+const EASE_FALL = 'cubic-bezier(.8,0,1,1)';
+
 let ballBusy = false;
 function playWithBall() {
   if (state.dead || ballBusy || busy) return;
@@ -352,16 +401,17 @@ function playWithBall() {
   ballEl.style.transform = 'translate(-50%, 0)';
   ballEl.classList.add('visible');
 
+  // Tres piques, cada uno más bajo y más corto que el anterior.
   const bounceKeyframes = [
-    { transform: 'translate(-50%, 0)' },
-    { transform: 'translate(-50%, -140px)' },
-    { transform: 'translate(-50%, 0)' },
-    { transform: 'translate(-42%, -90px)' },
-    { transform: 'translate(-42%, 0)' },
-    { transform: 'translate(-34%, -50px)' },
-    { transform: 'translate(-34%, 0)' }
+    { transform: 'translate(-50%, 0)',       offset: 0,     easing: EASE_RISE },
+    { transform: 'translate(-50%, -150px)',  offset: 0.2,   easing: EASE_FALL },
+    { transform: 'translate(-50%, 0)',       offset: 0.4,   easing: EASE_RISE },
+    { transform: 'translate(-42%, -90px)',   offset: 0.57,  easing: EASE_FALL },
+    { transform: 'translate(-42%, 0)',       offset: 0.74,  easing: EASE_RISE },
+    { transform: 'translate(-34%, -45px)',   offset: 0.87,  easing: EASE_FALL },
+    { transform: 'translate(-34%, 0)',       offset: 1 }
   ];
-  const anim = ballEl.animate(bounceKeyframes, { duration: 1400, easing: 'ease-out' });
+  const anim = ballEl.animate(bounceKeyframes, { duration: 1250 });
 
   anim.onfinish = () => {
     ballEl.style.transition = 'transform .3s ease';
@@ -370,6 +420,7 @@ function playWithBall() {
     setTimeout(() => {
       stageEl.classList.add('away');
       parkEl.classList.add('active');
+      setTimeout(playParkTrick, 350);
 
       setTimeout(() => {
         stageEl.classList.remove('away');
@@ -385,6 +436,35 @@ function playWithBall() {
       }, 2400);
     }, 500);
   };
+}
+
+// En el parque, la pelota hace algo random: patada, tiro alto, o cabeceo.
+function playParkTrick() {
+  const tricks = [
+    // patear: sale disparada al costado y vuelve
+    [
+      { transform: 'translate(64px, -6px)',   offset: 0,    easing: EASE_RISE },
+      { transform: 'translate(150px, -34px)', offset: 0.4,  easing: EASE_FALL },
+      { transform: 'translate(64px, -6px)',   offset: 1 }
+    ],
+    // lanzar: la tira bien alto y la recibe de vuelta
+    [
+      { transform: 'translate(64px, -6px)',    offset: 0,    easing: EASE_RISE },
+      { transform: 'translate(64px, -170px)',  offset: 0.45, easing: EASE_FALL },
+      { transform: 'translate(64px, -6px)',    offset: 1 }
+    ],
+    // cabecear: un par de golpecitos cortos justo arriba de la cabeza
+    [
+      { transform: 'translate(64px, -6px)',   offset: 0,    easing: EASE_RISE },
+      { transform: 'translate(64px, -60px)',  offset: 0.25, easing: EASE_FALL },
+      { transform: 'translate(64px, -6px)',   offset: 0.5,  easing: EASE_RISE },
+      { transform: 'translate(64px, -50px)',  offset: 0.75, easing: EASE_FALL },
+      { transform: 'translate(64px, -6px)',   offset: 1 }
+    ]
+  ];
+  const pick = tricks[Math.floor(Math.random() * tricks.length)];
+  ballEl.style.transition = '';
+  ballEl.animate(pick, { duration: 950 });
 }
 
 function restart() {
