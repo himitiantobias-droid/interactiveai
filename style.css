@@ -1,0 +1,252 @@
+:root{
+  --bg: #0E1116;
+  --surface: #171B24;
+  --border: #2A2F3C;
+  --text: #ECEEF3;
+  --muted: #8B93A7;
+  --accent: #57D6C4;
+  --sick: #E8544A;
+  --plate: #C9A876;
+  --kibble: #7A5A3A;
+  --water: #4FB6E6;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background: radial-gradient(1200px 800px at 50% -10%, #16233022, transparent), var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  overflow-x:hidden;
+}
+header{
+  padding: 22px clamp(16px,4vw,48px) 8px;
+  border-bottom: 1px solid var(--border);
+  text-align:center;
+}
+header h1{
+  font-family:'Fraunces', serif;
+  font-weight:600;
+  font-size: clamp(22px, 2.8vw, 30px);
+  margin: 0 0 4px;
+}
+header p{
+  margin: 0 auto;
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 620px;
+  line-height:1.5;
+}
+
+main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding: clamp(16px,4vw,32px);
+}
+
+.scene{
+  position: relative;
+  width: min(560px, 92vw);
+  height: min(560px, 76vh);
+  display:flex; align-items:center; justify-content:center;
+  overflow: hidden;
+  border-radius: 28px;
+}
+
+/* --- Mini escena de parque, para cuando se va a jugar --- */
+.park{
+  position:absolute; inset:0;
+  opacity:0;
+  pointer-events:none;
+  transition: opacity .5s ease;
+  background: linear-gradient(180deg, #274b52 0%, #2f5c4f 55%, #2c5540 100%);
+  border-radius: 28px;
+  overflow:hidden;
+}
+.park.active{ opacity:1; }
+.park-hill{
+  position:absolute; left:-10%; right:-10%; bottom:-10%; height:55%;
+  background: #356b47;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+.park-tree{
+  position:absolute; bottom:22%; width:34px; height:34px;
+  background: #2f6b3f;
+  border-radius: 50%;
+  box-shadow: 0 20px 0 -8px #4a3826;
+}
+.park-tree--a{ left:14%; transform: scale(1.4); }
+.park-tree--b{ right:16%; bottom:26%; transform: scale(1.1); }
+
+.stage{
+  position:relative;
+  z-index: 2;
+  display:flex; align-items:center; justify-content:center;
+  transition: transform .7s cubic-bezier(.6,0,.4,1), opacity .7s ease;
+}
+.stage.away{
+  transform: translateX(38%) scale(.34);
+  opacity: .85;
+}
+
+.avatar-frame{
+  width: min(360px, 68vw);
+  aspect-ratio: 1 / 1;
+  position: relative;
+  display:flex; align-items:center; justify-content:center;
+}
+
+.glow{
+  position:absolute; inset:8%;
+  border-radius: 50%;
+  filter: blur(38px);
+  opacity: .35;
+  background: var(--accent);
+  transition: opacity .4s ease, transform .4s ease, background-color .6s ease;
+}
+.avatar-frame.speaking .glow,
+.avatar-frame.petting .glow{
+  opacity: .6;
+  animation: pulse 1.1s ease-in-out infinite;
+}
+.avatar-frame.sick .glow{
+  background: var(--sick) !important;
+  opacity: .5;
+  animation: sickPulse 2.4s ease-in-out infinite;
+}
+.avatar-frame.dead .glow{
+  background: #3a3f4a !important;
+  opacity: .18;
+  filter: blur(30px) grayscale(1);
+  animation: none;
+}
+@keyframes pulse{
+  0%,100%{ transform:scale(1); opacity:.55; }
+  50%{ transform:scale(1.1); opacity:.85; }
+}
+@keyframes sickPulse{
+  0%,100%{ transform:scale(1); opacity:.4; }
+  50%{ transform:scale(1.05); opacity:.6; }
+}
+
+.avatar-face{ width:100%; height:100%; display:block; position:relative; z-index:2; }
+.avatar-frame.dead .avatar-face{ filter: grayscale(1) brightness(.8); }
+
+#eyes ellipse{ fill: var(--text); transition: rx .2s ease, ry .2s ease, cy .2s ease; }
+#eyes ellipse{ transform-box: fill-box; transform-origin: center; }
+#eyes.blink ellipse, ellipse.blink{ animation: blinkKf .28s ease; }
+@keyframes blinkKf{ 0%,100%{ transform:scaleY(1); } 50%{ transform:scaleY(.08); } }
+#mouth{ stroke: var(--text); fill:none; stroke-width:7; stroke-linecap:round; transition: d .2s ease, stroke .3s ease; }
+.avatar-frame.sick #mouth{ stroke: #FFD9D5; }
+
+/* --- Platito con croquetas, al comer --- */
+.plate{
+  position:absolute; left:50%; bottom:6%; transform: translate(-50%, 20%);
+  width: 88px; height: 40px;
+  opacity:0; pointer-events:none;
+  transition: opacity .35s ease, transform .35s ease;
+  z-index: 3;
+}
+.plate.show{ opacity:1; transform: translate(-50%, 0); }
+.plate-base{
+  position:absolute; inset:0;
+  background: var(--plate);
+  border-radius: 50%;
+  box-shadow: inset 0 4px 0 rgba(0,0,0,.15);
+}
+.kibble{
+  position:absolute; width:8px; height:8px; border-radius:50%;
+  background: var(--kibble);
+  top: 12px;
+}
+.kibble:nth-child(2){ left:16px; top:16px; }
+.kibble:nth-child(3){ left:30px; top:10px; }
+.kibble:nth-child(4){ left:44px; top:18px; }
+.kibble:nth-child(5){ left:58px; top:11px; }
+.kibble:nth-child(6){ left:68px; top:17px; }
+
+/* --- Vasito de agua, al beber --- */
+.cup{
+  position:absolute; left:50%; bottom:6%; transform: translate(-50%, 20%);
+  opacity:0; pointer-events:none;
+  transition: opacity .35s ease, transform .35s ease;
+  z-index: 3;
+}
+.cup.show{ opacity:1; transform: translate(-50%, 0); }
+.cup-body{
+  width: 30px; height: 38px;
+  border: 3px solid #DCE6EA;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  position: relative;
+  overflow:hidden;
+  background: rgba(255,255,255,.05);
+}
+.cup-water{
+  position:absolute; left:0; right:0; bottom:0;
+  height: 70%;
+  background: var(--water);
+  transition: height 1.1s ease;
+}
+.cup.drink .cup-water{ height: 12%; }
+
+/* --- Vómito, mientras está enferma --- */
+.vomit{
+  position:absolute; left:50%; top:64%; transform: translate(-50%, 0) scale(.4);
+  width: 26px; height: 18px;
+  border-radius: 50% 50% 60% 60%;
+  background: #9CCB6E;
+  opacity: 0;
+  z-index: 3;
+}
+.vomit.burst{
+  animation: vomitBurst .7s ease-out;
+}
+@keyframes vomitBurst{
+  0%{ opacity:0; transform: translate(-50%, -6px) scale(.2); }
+  35%{ opacity:1; transform: translate(-50%, 6px) scale(1); }
+  100%{ opacity:0; transform: translate(-50%, 14px) scale(.8); }
+}
+
+/* --- Pelota, al jugar --- */
+.ball{
+  position:absolute;
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  left: 50%; bottom: 8%;
+  transform: translate(-50%, 0);
+  opacity: 0;
+  z-index: 4;
+  background:
+    radial-gradient(circle at 32% 28%, #ffffff, #f3ede0 55%, #e2d8c2 100%);
+  box-shadow:
+    inset -6px -8px 10px rgba(0,0,0,.18),
+    inset 4px 4px 8px rgba(255,255,255,.5);
+}
+.ball::before, .ball::after{
+  content:"";
+  position:absolute; inset:0;
+  border-radius:50%;
+  border: 2px solid rgba(122,90,58,.35);
+  clip-path: polygon(0 40%, 100% 40%, 100% 60%, 0 60%);
+}
+.ball::before{ transform: rotate(35deg); }
+.ball::after{ transform: rotate(-35deg); }
+.ball.visible{ opacity: 1; }
+
+.revive-hint{
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align:center;
+}
+.revive-hint strong{ color: var(--sick); }
+
+@media (max-width: 520px){
+  .avatar-frame{ width: min(280px, 70vw); }
+}
