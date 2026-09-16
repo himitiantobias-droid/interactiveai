@@ -147,7 +147,7 @@ main{
 /* --- Platito con croquetas, al comer --- */
 .plate{
   position:absolute; left:50%; bottom:6%; transform: translate(-50%, 20%);
-  width: 88px; height: 40px;
+  width: 96px; height: 46px;
   opacity:0; pointer-events:none;
   transition: opacity .35s ease, transform .35s ease;
   z-index: 3;
@@ -160,15 +160,28 @@ main{
   box-shadow: inset 0 4px 0 rgba(0,0,0,.15);
 }
 .kibble{
-  position:absolute; width:8px; height:8px; border-radius:50%;
+  position:absolute; width:7px; height:7px; border-radius:50%;
   background: var(--kibble);
-  top: 12px;
+  top: 10px; left: 10px;
 }
-.kibble:nth-child(2){ left:16px; top:16px; }
-.kibble:nth-child(3){ left:30px; top:10px; }
-.kibble:nth-child(4){ left:44px; top:18px; }
-.kibble:nth-child(5){ left:58px; top:11px; }
-.kibble:nth-child(6){ left:68px; top:17px; }
+.kibble:nth-child(2){ left:24px; top:12px; }
+.kibble:nth-child(3){ left:38px; top:9px; }
+.kibble:nth-child(4){ left:52px; top:13px; }
+.kibble:nth-child(5){ left:66px; top:10px; }
+.kibble:nth-child(6){ left:18px; top:22px; }
+.kibble:nth-child(7){ left:32px; top:25px; }
+.kibble:nth-child(8){ left:46px; top:21px; }
+.kibble:nth-child(9){ left:60px; top:24px; }
+.kibble:nth-child(10){ left:74px; top:20px; }
+
+/* Croqueta individual que "vuela" del plato a la boca al presionar C */
+.kibble-flying{
+  position:absolute; left:50%; bottom:14%;
+  width:8px; height:8px; border-radius:50%;
+  background: var(--kibble);
+  transform: translate(-50%, 0);
+  z-index: 5;
+}
 
 /* --- Vasito de agua, al beber --- */
 .cup{
