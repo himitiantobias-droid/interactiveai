@@ -38,6 +38,8 @@ const MOUTH = {
 };
 const MOUTH_CHEW = 'M 80 126 Q 100 140 120 126';
 const MOUTH_IDLE_OPEN = 'M 78 126 Q 100 142 122 126';
+const MOUTH_O = 'M 82 120 Q 100 104 118 120 Q 100 150 82 120';
+const MAX_RAPID_FEED = 3;
 
 const rand = (min, max) => min + Math.random() * (max - min);
 
@@ -177,8 +179,18 @@ function scheduleMouthIdle() {
 }
 
 // --- Comer / beber ---
+let eating = false;
+let rapidFeedAttempts = 0;
+
 function feed() {
-  if (state.dead || busy) return;
+  if (state.dead) return;
+  if (eating) {
+    // Le dieron otra croqueta antes de tragar la anterior: riesgo de ahogo.
+    rapidFeedAttempts++;
+    if (rapidFeedAttempts > MAX_RAPID_FEED) choke();
+    return;
+  }
+  if (busy) return;
   if (state.foodToday >= FOOD_CAP) { triggerOverfeed(); return; }
   state.foodToday++;
   state.daysWithoutFood = 0;
@@ -194,17 +206,54 @@ function water() {
   playDrinkAnimation();
 }
 
+function spawnFlyingKibble() {
+  const k = document.createElement('div');
+  k.className = 'kibble-flying';
+  avatarFrame.appendChild(k);
+  const anim = k.animate([
+    { transform: 'translate(-50%, 0) scale(1)', bottom: '14%', opacity: 1 },
+    { transform: 'translate(-50%, 0) scale(.55)', bottom: '36%', opacity: 0 }
+  ], { duration: 520, easing: 'ease-in' });
+  anim.onfinish = () => k.remove();
+}
+
 function playEatAnimation() {
+  eating = true;
   busy = true;
   plateEl.classList.add('show');
-  const base = mouth.getAttribute('d');
-  let n = 0;
-  const chew = setInterval(() => {
-    mouth.setAttribute('d', n % 2 === 0 ? MOUTH_CHEW : base);
-    n++;
-    if (n >= 4) { clearInterval(chew); mouth.setAttribute('d', base); }
-  }, 220);
-  setTimeout(() => { plateEl.classList.remove('show'); busy = false; }, 1600);
+  spawnFlyingKibble();
+
+  const base = MOUTH[currentTier()] || MOUTH.neutral;
+  setTimeout(() => {
+    let n = 0;
+    const chew = setInterval(() => {
+      mouth.setAttribute('d', n % 2 === 0 ? MOUTH_CHEW : base);
+      n++;
+      if (n >= 4) {
+        clearInterval(chew);
+        // Traga: siempre abre la boca en O, es la señal de que ya se le puede dar la próxima.
+        mouth.setAttribute('d', MOUTH_O);
+        setTimeout(() => {
+          plateEl.classList.remove('show');
+          eating = false;
+          busy = false;
+          rapidFeedAttempts = 0;
+          applyBaseExpression();
+        }, 380);
+      }
+    }, 220);
+  }, 520);
+}
+
+function choke() {
+  eating = false;
+  busy = false;
+  rapidFeedAttempts = 0;
+  plateEl.classList.remove('show');
+  state.dead = true;
+  save();
+  applyBaseExpression();
+  updateReviveHint();
 }
 function playDrinkAnimation() {
   busy = true;
