@@ -12,6 +12,13 @@ const ballEl = $('ball');
 const stageEl = $('stage');
 const parkEl = $('park');
 const reviveHint = $('reviveHint');
+const sceneEl = $('scene');
+
+function denied() {
+  sceneEl.classList.remove('deny-shake');
+  void sceneEl.offsetWidth;
+  sceneEl.classList.add('deny-shake');
+}
 
 const HOUR = 3_600_000;
 const DAY_MS = 24 * HOUR;
@@ -220,10 +227,11 @@ function feed() {
   if (eating) {
     // Le dieron otra croqueta antes de tragar la anterior: riesgo de ahogo.
     rapidFeedAttempts++;
+    denied();
     if (rapidFeedAttempts > MAX_RAPID_FEED) choke();
     return;
   }
-  if (busy) return;
+  if (busy) { denied(); return; }
 
   const startingNewPlato = state.bitesInCurrentPlato === 0;
   if (startingNewPlato && state.platosToday >= PLATOS_CAP) {
@@ -244,7 +252,8 @@ function feed() {
   playEatAnimation();
 }
 function water() {
-  if (state.dead || busy) return;
+  if (state.dead) return;
+  if (busy) { denied(); return; }
   if (state.waterToday >= WATER_CAP) { triggerOverfeed(); return; }
   state.waterToday++;
   state.daysWithoutWater = 0;
@@ -367,7 +376,8 @@ let petTimeout = null;
 let affectionInterval = null;
 
 function onSpaceDown() {
-  if (state.dead || spaceHeld || busy) return;
+  if (state.dead || spaceHeld) return;
+  if (busy) { denied(); return; }
   spaceHeld = true;
   petTimeout = setTimeout(enterPetting, PET_HOLD_THRESHOLD);
 }
