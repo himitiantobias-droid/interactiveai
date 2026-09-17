@@ -109,8 +109,13 @@ function evaluateDay(bitesTotal, water, affection, ballPlays, platosCompleted) {
   if (water === 0) state.daysWithoutWater++; else state.daysWithoutWater = 0;
 
   const played = (affection || 0) >= 1 || (ballPlays || 0) >= 1;
-  const goodDay = bitesTotal >= 1 && water >= 1 && played;
-  state.moodScore = Math.max(-3, Math.min(3, state.moodScore + (goodDay ? 1 : -1)));
+  const fedAndHydrated = bitesTotal >= 1 && water >= 1;
+  // Comida + agua alcanza para no empeorar; jugar/acariciar además suma para
+  // estar más alegre. Faltar comida o agua sí la va entristeciendo.
+  let moodDelta = 0;
+  if (!fedAndHydrated) moodDelta = -1;
+  else if (played) moodDelta = 1;
+  state.moodScore = Math.max(-3, Math.min(3, state.moodScore + moodDelta));
 
   state.malnourishedStreak = platosCompleted >= PLATOS_CAP ? 0 : (state.malnourishedStreak || 0) + 1;
 
