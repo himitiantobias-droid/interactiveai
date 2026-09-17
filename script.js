@@ -555,6 +555,107 @@ function revive() {
   renderName();
 }
 
+// --- Hablarle por voz (cerebro local vía Ollama, sin nube ni key) ---
+// Requiere tener Ollama corriendo en la misma compu con CORS habilitado:
+//   OLLAMA_ORIGINS="*" ollama serve
+// y el modelo bajado: ollama pull llama3.2 (o cambiá OLLAMA_MODEL abajo).
+const OLLAMA_URL = 'http://localhost:11434/api/generate';
+const OLLAMA_MODEL = 'llama3.2';
+
+let voiceOn = false;
+let ollamaBusy = false;
+let talkTimer = null;
+const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+
+if (SpeechRecognitionCtor) {
+  recognition = new SpeechRecognitionCtor();
+  recognition.lang = 'es-AR';
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.onresult = (e) => {
+    if (busy || ollamaBusy) return;
+    const last = e.results[e.results.length - 1];
+    if (!last.isFinal) return;
+    const text = last[0].transcript.trim();
+    if (text) handleVoiceInput(text);
+  };
+  recognition.onerror = () => {};
+  recognition.onend = () => { if (voiceOn) { try { recognition.start(); } catch {} } };
+}
+
+function toggleVoice() {
+  if (state.dead) return;
+  if (!recognition) { denied(); return; }
+  voiceOn = !voiceOn;
+  if (voiceOn) { try { recognition.start(); } catch {} }
+  else { try { recognition.stop(); } catch {} }
+}
+
+async function handleVoiceInput(text) {
+  if (state.dead || ollamaBusy) return;
+  ollamaBusy = true;
+  if (recognition) { try { recognition.stop(); } catch {} }
+
+  const system = `Sos ${state.petName || 'Lu'}, una mascota virtual con personalidad propia: `
+    + 'cálida, curiosa, un poco traviesa. Hablás en español rioplatense, corto (1-3 frases). '
+    + 'El micrófono capta todo el ambiente, no solo lo que te hablan a vos directamente — si lo '
+    + 'que escuchás es ruido, una charla entre otras personas, o claramente no es para vos, no '
+    + 'respondas: devolvé exactamente {"texto":"","emocion":"neutral"}. Respondé SIEMPRE en JSON '
+    + 'puro, sin markdown: {"texto":"tu respuesta acá (o vacío)", "emocion":"neutral|feliz|triste"}.';
+
+  try {
+    const res = await fetch(OLLAMA_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: OLLAMA_MODEL, system, prompt: text, format: 'json', stream: false })
+    });
+    if (!res.ok) throw new Error('ollama-error');
+    const data = await res.json();
+    let parsed;
+    try { parsed = JSON.parse(data.response); } catch { parsed = { texto: data.response, emocion: 'neutral' }; }
+    if (parsed.texto && parsed.texto.trim()) speakReply(parsed.texto, parsed.emocion);
+  } catch (err) {
+    denied();
+  } finally {
+    ollamaBusy = false;
+    if (voiceOn && !busy) { try { recognition.start(); } catch {} }
+  }
+}
+
+function speakReply(text, emocion) {
+  const tier = ['feliz', 'triste'].includes(emocion) ? emocion : 'neutral';
+  const eyeShape = EYES[tier] || EYES.neutral;
+  eyeL.setAttribute('rx', eyeShape.rx); eyeL.setAttribute('ry', eyeShape.ry); eyeL.setAttribute('cy', eyeShape.cy);
+  eyeR.setAttribute('rx', eyeShape.rx); eyeR.setAttribute('ry', eyeShape.ry); eyeR.setAttribute('cy', eyeShape.cy);
+  mouth.setAttribute('d', MOUTH[tier] || MOUTH.neutral);
+
+  if (!('speechSynthesis' in window)) return;
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'es-AR';
+  const esVoice = speechSynthesis.getVoices().find((v) => v.lang && v.lang.toLowerCase().startsWith('es'));
+  if (esVoice) utter.voice = esVoice;
+
+  busy = true;
+  let open = false;
+  const base = mouth.getAttribute('d');
+  talkTimer = setInterval(() => {
+    open = !open;
+    mouth.setAttribute('d', open ? MOUTH_O : base);
+  }, 170);
+
+  const finish = () => {
+    clearInterval(talkTimer);
+    busy = false;
+    applyBaseExpression();
+    if (voiceOn) { try { recognition.start(); } catch {} }
+  };
+  utter.onend = finish;
+  utter.onerror = finish;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utter);
+}
+
 // --- Teclado ---
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') {
@@ -565,6 +666,7 @@ window.addEventListener('keydown', (e) => {
   const key = e.key.toLowerCase();
   if (key === 'c') feed();
   else if (key === 'a') water();
+  else if (key === 'v') toggleVoice();
   else if (key === 'r' && state.dead) revive();
 });
 window.addEventListener('keyup', (e) => {
