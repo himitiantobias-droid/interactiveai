@@ -86,7 +86,7 @@ function defaultState() {
     parkUntil: null,
     dead: false,
     diedAt: null,
-    petName: ''
+    petName: 'El BriAn'
   };
 }
 function load() {
