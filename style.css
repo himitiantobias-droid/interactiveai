@@ -244,6 +244,21 @@ main{
   100%{ opacity:0; transform: translate(-50%, 14px) scale(.8); }
 }
 
+/* --- Pastilla, al curarla con F --- */
+.pill{
+  position:absolute; left:50%; top:62%; transform: translate(-50%, -70%) scale(.3);
+  width: 22px; height: 10px; border-radius: 6px;
+  background: linear-gradient(90deg, var(--accent) 50%, var(--text) 50%);
+  opacity: 0;
+  z-index: 3;
+}
+.pill.taken{ animation: pillTaken .8s ease-out; }
+@keyframes pillTaken{
+  0%{ opacity:0; transform: translate(-50%, -70%) scale(.3); }
+  30%{ opacity:1; transform: translate(-50%, -50%) scale(1); }
+  100%{ opacity:0; transform: translate(-50%, -30%) scale(.6); }
+}
+
 /* --- Pelota, al jugar --- */
 .ball{
   position:absolute;
@@ -362,6 +377,18 @@ main{
   font-size: 10px; color: var(--muted); white-space:nowrap;
 }
 .friends-empty{ color: var(--muted); font-size: 13px; text-align:center; max-width: 280px; }
+
+.friend-detail{
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 18px;
+  text-align:center;
+  min-width: 200px;
+}
+.friend-detail-name{ font-family:'Fraunces', serif; font-weight:600; font-size: 18px; margin-bottom: 4px; }
+.friend-detail-mood{ color: var(--muted); font-size: 13px; }
+.friend-detail-deaths{ color: var(--sick); font-size: 13px; margin-top: 2px; }
 
 /* --- Mini avatares de amigos, en la escena del parque --- */
 .park-friends{

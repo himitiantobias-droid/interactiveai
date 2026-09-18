@@ -35,6 +35,11 @@
     <div class="friends-radar-me"></div>
   </div>
   <p class="friends-empty" id="friendsEmpty" hidden>Todavía no te encontraste con nadie en el parque.</p>
+  <div class="friend-detail" id="friendDetail" hidden>
+    <div class="friend-detail-name" id="friendDetailName"></div>
+    <div class="friend-detail-mood" id="friendDetailMood"></div>
+    <div class="friend-detail-deaths" id="friendDetailDeaths"></div>
+  </div>
 </div>
 
 <header>
@@ -46,7 +51,7 @@
       </svg>
     </button>
   </div>
-  <p>Una cara viva que hay que cuidar. <strong>C</strong> come, <strong>A</strong> bebe, mantené <strong>espacio</strong> para acariciarla, tocalo y soltalo rápido para jugar a la pelota, <strong>V</strong> activa/desactiva la escucha por voz.</p>
+  <p>Una cara viva que hay que cuidar. <strong>C</strong> come, <strong>A</strong> bebe, mantené <strong>espacio</strong> para acariciarla, tocalo y soltalo rápido para jugar a la pelota, <strong>F</strong> la cura si está enferma, <strong>V</strong> activa/desactiva la escucha por voz.</p>
 </header>
 
 <main>
@@ -82,6 +87,7 @@
         </div>
 
         <div class="vomit" id="vomit" aria-hidden="true"></div>
+        <div class="pill" id="pill" aria-hidden="true"></div>
       </div>
 
       <div class="ball" id="ball" aria-hidden="true"></div>

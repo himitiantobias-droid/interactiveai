@@ -8,6 +8,7 @@ const mouth = $('mouth');
 const plateEl = $('plate');
 const cupEl = $('cup');
 const vomitEl = $('vomit');
+const pillEl = $('pill');
 const ballEl = $('ball');
 const stageEl = $('stage');
 const parkEl = $('park');
@@ -20,6 +21,10 @@ const friendsMapEl = $('friendsMap');
 const friendsMapClose = $('friendsMapClose');
 const friendsRadarEl = $('friendsRadar');
 const friendsEmptyEl = $('friendsEmpty');
+const friendDetailEl = $('friendDetail');
+const friendDetailName = $('friendDetailName');
+const friendDetailMood = $('friendDetailMood');
+const friendDetailDeaths = $('friendDetailDeaths');
 const parkFriendsEl = $('parkFriends');
 
 function denied() {
@@ -89,6 +94,7 @@ function defaultState() {
     malnourishedStreak: 0,
     moodScore: 0,
     sickUntil: null,
+    sickSince: null,
     parkUntil: null,
     dead: false,
     diedAt: null,
@@ -381,8 +387,27 @@ function closeFriendsMap() {
 friendsBtn.addEventListener('click', openFriendsMap);
 friendsMapClose.addEventListener('click', closeFriendsMap);
 
+const MOOD_LABEL = {
+  neutral: 'normal',
+  feliz: 'feliz',
+  triste: 'triste',
+  enfermo: 'enferma',
+  desnutrido: 'desnutrida',
+  muerto: 'muerta ahora mismo'
+};
+
+function showFriendDetail(p) {
+  friendDetailName.textContent = p.name || 'Amigo';
+  friendDetailMood.textContent = 'Estado: ' + (MOOD_LABEL[p.mood] || 'normal');
+  friendDetailDeaths.textContent = (p.deathCount || 0) > 0
+    ? 'Se murió ' + p.deathCount + ' ' + (p.deathCount === 1 ? 'vez' : 'veces')
+    : 'Nunca se murió';
+  friendDetailEl.hidden = false;
+}
+
 function renderFriendsMap() {
   friendsRadarEl.querySelectorAll('.friend-dot').forEach((d) => d.remove());
+  friendDetailEl.hidden = true;
   friendsEmptyEl.hidden = true;
   if (!fdb) { friendsEmptyEl.hidden = false; friendsEmptyEl.textContent = 'No se pudo conectar.'; return; }
 
@@ -422,7 +447,8 @@ function renderFriendDot(id, p) {
   dot.className = 'friend-dot mood-' + (p.mood || 'neutral');
   dot.style.left = x + '%';
   dot.style.top = y + '%';
-  dot.title = (p.name || 'Amigo') + ' — ' + (p.mood || 'neutral') + ' — murió ' + (p.deathCount || 0) + ' veces';
+  dot.title = (p.name || 'Amigo') + ' — ' + (MOOD_LABEL[p.mood] || 'normal') + ' — murió ' + (p.deathCount || 0) + ' veces';
+  dot.addEventListener('click', () => showFriendDetail(p));
 
   const label = document.createElement('span');
   label.textContent = p.name || 'Amigo';
@@ -590,10 +616,26 @@ function triggerOverfeed() {
   state.overflowUnits = (state.overflowUnits || 0) + 1;
   const addMs = 2 * HOUR + (state.overflowUnits - 1) * HOUR;
   const now = Date.now();
+  if (!state.sickSince) state.sickSince = now;
   state.sickUntil = Math.max(state.sickUntil || 0, now) + addMs;
   save();
   applyBaseExpression();
   scheduleVomitBursts();
+}
+
+function curePet() {
+  if (state.dead) return;
+  if (!isSick()) { denied(); return; }
+  state.sickUntil = null;
+  state.overflowUnits = 0;
+  state.sickSince = null;
+  save();
+  vomitTimers.forEach(clearTimeout);
+  vomitTimers = [];
+  pillEl.classList.remove('taken');
+  void pillEl.offsetWidth;
+  pillEl.classList.add('taken');
+  applyBaseExpression();
 }
 function scheduleVomitBursts() {
   vomitTimers.forEach(clearTimeout);
@@ -882,6 +924,7 @@ window.addEventListener('keydown', (e) => {
   const key = e.key.toLowerCase();
   if (key === 'c') feed();
   else if (key === 'a') water();
+  else if (key === 'f') curePet();
   else if (key === 'v') toggleVoice();
   else if (key === 'r' && state.dead) revive();
 });
@@ -898,6 +941,12 @@ function tick() {
   if (state.sickUntil && Date.now() >= state.sickUntil) {
     state.sickUntil = null;
     state.overflowUnits = 0;
+    state.sickSince = null;
+    save();
+  }
+  // Enferma sin curar 3 días reales seguidos: se muere.
+  if (isSick() && state.sickSince && Date.now() - state.sickSince >= 3 * DAY_MS) {
+    die();
     save();
   }
   if (state.parkUntil && Date.now() >= state.parkUntil) returnFromPark();
