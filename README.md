@@ -30,7 +30,7 @@ No hay botones en pantalla: todo el estado de ánimo se expresa a través de la 
 
 Apretando **V** se activa el micrófono (reconocimiento de voz del navegador, andá en Chrome) y Lu te contesta hablando, usando un modelo local de [Ollama](https://ollama.com) como cerebro — sin nube, sin key, gratis. Para que funcione:
 
-1. Instalá Ollama y bajá un modelo: `ollama pull llama3.2`
+1. Instalá Ollama y bajá un modelo: `ollama pull llama3.2:1b`
 2. Corré Ollama permitiendo que el navegador le hable:
    ```
    OLLAMA_ORIGINS="*" ollama serve

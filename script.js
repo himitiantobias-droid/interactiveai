@@ -563,9 +563,9 @@ function revive() {
 // --- Hablarle por voz (cerebro local vía Ollama, sin nube ni key) ---
 // Requiere tener Ollama corriendo en la misma compu con CORS habilitado:
 //   OLLAMA_ORIGINS="*" ollama serve
-// y el modelo bajado: ollama pull llama3.2 (o cambiá OLLAMA_MODEL abajo).
+// y el modelo bajado: ollama pull llama3.2:1b (o cambiá OLLAMA_MODEL abajo).
 const OLLAMA_URL = 'http://localhost:11434/api/generate';
-const OLLAMA_MODEL = 'llama3.2';
+const OLLAMA_MODEL = 'llama3.2:1b';
 
 let voiceOn = false;
 let ollamaBusy = false;
