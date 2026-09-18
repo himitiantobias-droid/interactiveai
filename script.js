@@ -15,6 +15,12 @@ const reviveHint = $('reviveHint');
 const sceneEl = $('scene');
 const petNameEl = $('petName');
 const editNameBtn = $('editNameBtn');
+const friendsBtn = $('friendsBtn');
+const friendsMapEl = $('friendsMap');
+const friendsMapClose = $('friendsMapClose');
+const friendsRadarEl = $('friendsRadar');
+const friendsEmptyEl = $('friendsEmpty');
+const parkFriendsEl = $('parkFriends');
 
 function denied() {
   sceneEl.classList.remove('deny-shake');
@@ -86,6 +92,7 @@ function defaultState() {
     parkUntil: null,
     dead: false,
     diedAt: null,
+    deathCount: 0,
     petName: 'El BriAn'
   };
 }
@@ -127,6 +134,7 @@ function evaluateDay(bitesTotal, water, affection, ballPlays, platosCompleted) {
 function die() {
   state.dead = true;
   state.diedAt = Date.now();
+  state.deathCount = (state.deathCount || 0) + 1;
 }
 
 function rolloverIfNeeded() {
@@ -167,6 +175,8 @@ function returnFromPark() {
   ballEl.style.transition = '';
   ballBusy = false;
   busy = false;
+  parkFriendsEl.innerHTML = '';
+  metFriendsThisVisit.clear();
 }
 
 function currentTier() {
@@ -218,6 +228,207 @@ editNameBtn.addEventListener('click', () => {
   save();
   renderName();
 });
+
+// --- Amigos: ubicación real, se encuentran en el parque, mapa radar ---
+// Necesita Firebase (Realtime Database) para que los dispositivos se vean
+// entre sí. Si el SDK no cargó o falla, el resto del juego sigue andando
+// normal, solo sin esta parte.
+const firebaseConfig = {
+  apiKey: "AIzaSyCz7jQwDxXqPeOqb8zwt4cgij1AK9bRL8Y",
+  authDomain: "mi-ai-924fa.firebaseapp.com",
+  databaseURL: "https://mi-ai-924fa-default-rtdb.firebaseio.com",
+  projectId: "mi-ai-924fa",
+  storageBucket: "mi-ai-924fa.firebasestorage.app",
+  messagingSenderId: "162959332908",
+  appId: "1:162959332908:web:74c50b4be7ff620b826389"
+};
+
+const MEET_DISTANCE_M = 100;
+const PRESENCE_STALE_MS = 60000;
+const DEVICE_ID_KEY = 'avatarPetDeviceId';
+
+let fdb = null;
+try {
+  if (typeof firebase !== 'undefined') {
+    firebase.initializeApp(firebaseConfig);
+    fdb = firebase.database();
+  }
+} catch (err) {
+  fdb = null;
+}
+
+function getDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = 'd_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+const deviceId = getDeviceId();
+
+let myLat = null;
+let myLng = null;
+if (navigator.geolocation) {
+  navigator.geolocation.watchPosition(
+    (pos) => { myLat = pos.coords.latitude; myLng = pos.coords.longitude; },
+    () => {},
+    { enableHighAccuracy: false, maximumAge: 30000, timeout: 15000 }
+  );
+}
+
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function bearingDeg(lat1, lng1, lat2, lng2) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const toDeg = (r) => (r * 180) / Math.PI;
+  const y = Math.sin(toRad(lng2 - lng1)) * Math.cos(toRad(lat2));
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lng2 - lng1));
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+function broadcastPresence() {
+  if (!fdb || myLat == null || myLng == null) return;
+  fdb.ref('presence/' + deviceId).set({
+    name: state.petName || 'Lu',
+    lat: myLat,
+    lng: myLng,
+    updatedAt: Date.now(),
+    mood: currentTier(),
+    deathCount: state.deathCount || 0,
+    parkUntil: state.parkUntil || null
+  });
+}
+
+const metFriendsThisVisit = new Set();
+
+function checkForFriendsNearby() {
+  if (!fdb || !isAtPark() || myLat == null) return;
+  fdb.ref('presence').once('value').then((snap) => {
+    const now = Date.now();
+    snap.forEach((child) => {
+      const id = child.key;
+      if (id === deviceId) return;
+      const p = child.val();
+      if (!p || !p.updatedAt || now - p.updatedAt > PRESENCE_STALE_MS) return;
+      if (!p.parkUntil || p.parkUntil < now) return;
+      if (p.lat == null || p.lng == null) return;
+      if (haversineMeters(myLat, myLng, p.lat, p.lng) <= MEET_DISTANCE_M) {
+        onMetFriend(id, p);
+      }
+    });
+  });
+}
+
+function onMetFriend(friendId, friendData) {
+  fdb.ref('friends/' + deviceId + '/' + friendId).set(true);
+  fdb.ref('friends/' + friendId + '/' + deviceId).set(true);
+  state.parkUntil = Math.max(state.parkUntil || 0, Date.now() + PARK_FRIENDS_MS);
+  save();
+  if (!metFriendsThisVisit.has(friendId)) {
+    metFriendsThisVisit.add(friendId);
+    showMeetupAvatar(friendId, friendData);
+  }
+}
+
+function miniFaceSvg(mood) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 200 200');
+  const eyeShape = EYES[mood] || EYES.neutral;
+  [68, 132].forEach((cx) => {
+    const e = document.createElementNS(NS, 'ellipse');
+    e.setAttribute('cx', cx);
+    e.setAttribute('cy', eyeShape.cy);
+    e.setAttribute('rx', eyeShape.rx);
+    e.setAttribute('ry', eyeShape.ry);
+    e.setAttribute('fill', '#ECEEF3');
+    svg.appendChild(e);
+  });
+  const mouthPath = document.createElementNS(NS, 'path');
+  mouthPath.setAttribute('d', MOUTH[mood] || MOUTH.neutral);
+  mouthPath.setAttribute('stroke', '#ECEEF3');
+  mouthPath.setAttribute('fill', 'none');
+  mouthPath.setAttribute('stroke-width', '9');
+  mouthPath.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(mouthPath);
+  return svg;
+}
+
+function showMeetupAvatar(friendId, friendData) {
+  if ($('friend-' + friendId)) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'mini-avatar';
+  wrap.id = 'friend-' + friendId;
+  wrap.appendChild(miniFaceSvg(friendData.mood));
+  parkFriendsEl.appendChild(wrap);
+}
+
+// --- Mapa de amigos (botón arriba a la izquierda) ---
+function openFriendsMap() {
+  friendsMapEl.hidden = false;
+  renderFriendsMap();
+}
+function closeFriendsMap() {
+  friendsMapEl.hidden = true;
+}
+friendsBtn.addEventListener('click', openFriendsMap);
+friendsMapClose.addEventListener('click', closeFriendsMap);
+
+function renderFriendsMap() {
+  friendsRadarEl.querySelectorAll('.friend-dot').forEach((d) => d.remove());
+  friendsEmptyEl.hidden = true;
+  if (!fdb) { friendsEmptyEl.hidden = false; friendsEmptyEl.textContent = 'No se pudo conectar.'; return; }
+
+  fdb.ref('friends/' + deviceId).once('value').then((snap) => {
+    const ids = [];
+    snap.forEach((c) => { if (c.val()) ids.push(c.key); });
+    if (!ids.length) {
+      friendsEmptyEl.hidden = false;
+      friendsEmptyEl.textContent = 'Todavía no te encontraste con nadie en el parque.';
+      return;
+    }
+    Promise.all(ids.map((id) => fdb.ref('presence/' + id).once('value'))).then((snaps) => {
+      let shown = 0;
+      snaps.forEach((s, i) => {
+        const p = s.val();
+        if (p) { renderFriendDot(ids[i], p); shown++; }
+      });
+      if (!shown) {
+        friendsEmptyEl.hidden = false;
+        friendsEmptyEl.textContent = 'Todavía no te encontraste con nadie en el parque.';
+      }
+    });
+  });
+}
+
+function renderFriendDot(id, p) {
+  if (myLat == null || p.lat == null) return;
+  const dist = haversineMeters(myLat, myLng, p.lat, p.lng);
+  const brg = bearingDeg(myLat, myLng, p.lat, p.lng);
+  const maxDist = 5000;
+  const radius = Math.min(dist / maxDist, 1) * 46;
+  const angleRad = ((brg - 90) * Math.PI) / 180;
+  const x = 50 + radius * Math.cos(angleRad);
+  const y = 50 + radius * Math.sin(angleRad);
+
+  const dot = document.createElement('div');
+  dot.className = 'friend-dot mood-' + (p.mood || 'neutral');
+  dot.style.left = x + '%';
+  dot.style.top = y + '%';
+  dot.title = (p.name || 'Amigo') + ' — ' + (p.mood || 'neutral') + ' — murió ' + (p.deathCount || 0) + ' veces';
+
+  const label = document.createElement('span');
+  label.textContent = p.name || 'Amigo';
+  dot.appendChild(label);
+  friendsRadarEl.appendChild(dot);
+}
 
 // --- Gestos idle: parpadeo, guiño, boca suelta ---
 let busy = false;
@@ -692,6 +903,8 @@ function tick() {
   if (state.parkUntil && Date.now() >= state.parkUntil) returnFromPark();
   updateReviveHint();
   if (!busy) applyBaseExpression();
+  broadcastPresence();
+  checkForFriendsNearby();
 }
 setInterval(tick, 15000);
 
@@ -714,3 +927,4 @@ if (isSick()) scheduleVomitBursts();
 scheduleBlink();
 scheduleWink();
 scheduleMouthIdle();
+setTimeout(broadcastPresence, 2000);
