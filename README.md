@@ -30,7 +30,7 @@ No hay botones en pantalla: todo el estado de ánimo se expresa a través de la 
 
 Apretando **V** se activa el micrófono (reconocimiento de voz del navegador, andá en Chrome) y Lu te contesta hablando, usando un modelo local de [Ollama](https://ollama.com) como cerebro — sin nube, sin key, gratis. Para que funcione:
 
-1. Instalá Ollama y bajá un modelo: `ollama pull llama3.2`
+1. Instalá Ollama y bajá un modelo: `ollama pull llama3.2:1b`
 2. Corré Ollama permitiendo que el navegador le hable:
    ```
    OLLAMA_ORIGINS="*" ollama serve
@@ -38,3 +38,13 @@ Apretando **V** se activa el micrófono (reconocimiento de voz del navegador, an
 3. Abrí el juego en la misma computadora donde corre Ollama.
 
 Si usás otro modelo, cambiá `OLLAMA_MODEL` en `script.js`.
+
+## Amigos (ubicación real, requiere permiso de ubicación)
+
+El botón de arriba a la izquierda abre un mapa tipo radar con los amigos que te encontraste. Cómo funciona:
+
+- Mientras está en el parque (después de jugar a la pelota), tu dispositivo comparte su ubicación contra Firebase Realtime Database.
+- Si otro dispositivo con el juego abierto está en el parque a menos de 100 metros, las dos mascotas "se encuentran": la visita se extiende a 2 horas, aparecen juntas, y quedan como amigos para siempre.
+- El mapa muestra a cada amigo por dirección/distancia relativa a vos ahora mismo, con un color según su estado de ánimo, y cuántas veces se le murió la mascota.
+
+Usa un proyecto de Firebase ya configurado en `script.js` (`firebaseConfig`) — si armás tu propio proyecto, reemplazalo ahí.
